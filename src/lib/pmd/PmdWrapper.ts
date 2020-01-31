@@ -1,5 +1,10 @@
-import child_process = require('child_process');
+import shell = require("shelljs");
+import path = require("path");
+import process = require("process");
 
+const base = path.join('dist', 'pmd', 'bin');
+const pmdRunScript = path.join(`${base}`, 'run.sh') + " pmd";
+const pmdRunWin = path.join(`${base}`, 'pmd.bat');
 
 
 /**
@@ -11,39 +16,43 @@ export enum Format {
     TEXT = "txt"
 }
 
+/**
+ * Wrapper around PMD interactions
+ */
 export default class PmdWrapper {
 
-    path: string;
+    source: string;
     rules: string;
     reportFormat: Format;
     reportFile: string;
 
 
-    constructor(path: string, rules: string, reportFormat: Format, reportFile: string) {
-        this.path = path;
+    constructor(source: string, rules: string, reportFormat: Format, reportFile: string) {
+        this.source = source;
         this.rules = rules;
         this.reportFormat = reportFormat;
         this.reportFile = reportFile;
     }
 
-    public static async execute(path: string, rules: string, reportFormat: Format, reportFile: string) {
-        const myPmd = new PmdWrapper(path, rules, reportFormat, reportFile);
-        myPmd.runShellCommand();
+    public static async execute(source: string, rules: string, reportFormat: Format, reportFile: string) {
+        const myPmd = new PmdWrapper(source, rules, reportFormat, reportFile);
+        myPmd.runPmd();
     }
 
-    async runShellCommand() {
-        const runCommand: string = `bash execute-pmd.sh --rulesets ${this.rules} --dir ${this.path} --format ${this.reportFormat} --reportfile ${this.reportFile}`;
-        child_process.exec(runCommand, (err, stdout, stderr) => {
-            //TODO: revisit this and decide how we want to handle and surface errors
-            if (err) {
-                console.log(`Error occurred while running pmd: ${err.message}`);
-            }
-            if (stderr) {
-                console.log(`stderr from PMD: ${stderr}`);
-            }
-            if (stdout) {
-                console.log(`Script had something to say: ${stdout}`);
-            }
-        });
+    async runPmd() {
+        const runCommand = this.getRunCommand();
+        shell.exec(`${runCommand} -rulesets ${this.rules} -dir ${this.source} -format ${this.reportFormat} -reportfile ${this.reportFile}`);
+    }
+
+    getRunCommand(): string {
+        if (this.isWindows()) {
+            return pmdRunWin;
+        } else {
+            return pmdRunScript;
+        }
+    }
+
+    isWindows(): boolean {
+        return process.platform === "win32";
     }
 }
